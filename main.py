@@ -126,7 +126,7 @@ class Element:
 class Car(Element):
     image_paths = [
         # "images/delorean.png",
-        "images/acura.png",
+        "images/dino-car.png",
         # "images/maluch.png",
         # "images/kot.png",
         # "images/car.png",
@@ -251,7 +251,7 @@ class OtherCar(Obstacle):
 
 
 class Bullet(Obstacle):
-    image_path = "images/bullet.png"
+    image_path = "images/slime.png"
 
     def __init__(self, car: Car, **kwargs) -> None:
         super().__init__(**kwargs)
