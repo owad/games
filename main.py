@@ -31,6 +31,7 @@ class Element:
     y = 0
     respect_borders = False
     image_path: str
+    show_explosion = False
 
     def __init__(self, screen: Surface):
         self.image = pygame.image.load(self.image_path)
@@ -80,7 +81,11 @@ class Element:
         self.x = x
 
     def draw(self):
-        self.screen.blit(self.image, (self.x, self.y))
+        explosion_image = pygame.image.load("images/explosion.gif")
+        if self.exploded():
+            self.screen.blit(explosion_image, (self.x - 60, self.y))
+        else:
+            self.screen.blit(self.image, (self.x, self.y))
 
     @property
     def size(self) -> Tuple[int, int]:
@@ -94,35 +99,36 @@ class Element:
     def height(self) -> int:
         return self.size[1]
 
-    @property
-    def _rect(self) -> Rect:
-        x1 = self.x
-        x2 = self.x + self.image.get_width()
-        y1 = self.y
-        y2 = self.y + self.image.get_height()
-        return Rect(x1=x1, x2=x2, y1=y1, y2=y2)
-
     def overlaps_with(self, element: "Element") -> bool:
-        rec1 = self._rect
-        rec2 = element._rect
+        element_1_x_position = self.x, self.x + self.width
+        element_1_y_position = self.y, self.y + self.height
+        element_2_x_position = element.x, element.x + element.width
+        element_2_y_position = element.y, element.y + element.height
 
-        if (rec1.x1 < rec2.x2 < rec1.x2) or (rec1.x1 < rec2.x1 < rec1.x2):
-            x_match = True
-        else:
-            x_match = False
-        if (rec1.y1 < rec2.y2 < rec1.y2) or (rec1.y1 < rec2.y1 < rec1.y2):
-            y_match = True
-        else:
-            y_match = False
-        if x_match and y_match:
-            return True
-        else:
-            return False
+        x_overlaps = set(range(*element_1_x_position)) & set(range(*element_2_x_position))
+        y_overlaps = set(range(*element_1_y_position)) & set(range(*element_2_y_position))
+
+        return x_overlaps and y_overlaps
+
+    def has_left_screen(self) -> bool:
+        return self.y - self.height <= 0
+
+    def exploded(self) -> bool:
+        return self.show_explosion
+
+    def explode(self):
+        self.show_explosion = True
+
+    def unexplode(self):
+        self.show_explosion = False
 
 
 class Car(Element):
     image_paths = [
-        "images/delorean.png",
+        # "images/delorean.png",
+        "images/acura.png",
+        # "images/maluch.png",
+        # "images/kot.png",
         # "images/car.png",
         # "images/car2.png",
         # "images/car3.png",
@@ -130,6 +136,9 @@ class Car(Element):
     ]
     respect_borders = True
     speed = 5
+    bullets = []
+    fire_rate = 40
+    fire_count = 0
 
     def __init__(self, **kwargs):
         super(Car, self).__init__(**kwargs)
@@ -149,15 +158,31 @@ class Car(Element):
         self.center_horizontally()
         self.move_down(self.screen.get_height() - self.height - 20)
 
-    def turbo_on(self) -> bool:
-        return pygame.key.get_pressed()[pygame.K_SPACE]
-
     def draw(self):
-        super(Car, self).draw()
+        super().draw()
 
-        if self.turbo_on():
-            self.screen.blit(self.blast, (self.x, self.y + self.height - 20))
-            self.screen.blit(self.blast, (self.x + 50, self.y + self.height - 20))
+        for bullet in self.bullets:
+            bullet.draw()
+            if bullet.has_left_screen():
+                self.bullets.remove(bullet)
+                del bullet
+
+    def fire_bullet(self) -> None:
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_SPACE] and not self.exploded():
+            if self.fire_count % self.fire_rate == 0:
+                self.bullets.append(Bullet(screen=self.screen, car=self))
+                self.fire_count = 0
+            self.fire_count += 1
+        else:
+            self.fire_count = 0
+
+    def bullets_hit_opponent(self, game: "Game", opponents: List["OtherCar"]):
+        for bullet in self.bullets:
+            for opponent in opponents:
+                if bullet.overlaps_with(opponent) and not opponent.exploded():
+                    opponent.explode()
+                    game.score += 2
 
 
 class Road(Element):
@@ -205,22 +230,38 @@ class Obstacle(Element):
         super().draw()
 
 
-class Explosion(Obstacle):
-    obstacle_images = [
-        "images/explosion.gif",
-    ]
-
-
 class OtherCar(Obstacle):
     obstacle_images = [
         "images/car.png",
         "images/car2.png",
         "images/car3.png",
         "images/delorean.png",
+        "images/acura.png",
     ]
 
     def move_down(self, step: int) -> None:
         super().move_down(step=step - 1)
+
+    def draw(self):
+        if self.y >= self.screen.get_height():
+            self.unexplode()
+            self.y = self.get_random_y_position()
+            self.x = self.get_random_x_position()
+        super().draw()
+
+
+class Bullet(Obstacle):
+    image_path = "images/bullet.png"
+
+    def __init__(self, car: Car, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.car = car
+        self.x = int(car.x + car.width / 2)
+        self.y = car.y
+
+    def draw(self):
+        self.y -= self.car.speed + 5
+        self.screen.blit(self.image, (self.x, self.y - self.car.speed + 3))
 
 
 class Game:
@@ -228,6 +269,7 @@ class Game:
     static_objects: List["Element"]
     game_speed: int = GAME_SPEED
     score: int = 0
+    current_speed: int = GAME_SPEED
 
     def __init__(self, window_width: int = 530, window_height: int = 800):
         self.window_width = window_width
@@ -254,7 +296,6 @@ class Game:
 
     def run(self):
         self.running = True
-        current_normal_speed = self.game_speed
 
         while self.running:
             self._check_game_closed()
@@ -263,23 +304,24 @@ class Game:
             self._move_static_objects(step=self.game_speed)
             self._draw_statis_objects()
 
-            self.car.move()
+            if self.game_speed > 0:
+                self.car.move()
+
             self.car.draw()
 
+            self.car.fire_bullet()
+            self.car.bullets_hit_opponent(self, self.opponents)
+
             self._draw_score()
-
             self._fuel_tank_collected()
-
-            logger.warning(self.game_speed)
-            if self.car.turbo_on():
-                # self.game_speed = 10
-                self.car.speed = 10
-            else:
-                # self.game_speed = current_normal_speed
-                self.car.speed = CAR_SPEED
 
             if self._reset_pressed():
                 self.reset()
+                self.score = 0
+
+            if self._opponent_hit():
+                self.stop()
+                self.car.explode()
 
             pygame.display.flip()
 
@@ -291,15 +333,22 @@ class Game:
 
     def reset(self):
         self.car.speed = CAR_SPEED
+        self.car.show_explosion = False
         self.game_speed = GAME_SPEED
         self.car.init_car_position()
         for obstacle in self.obstacles:
             obstacle.x = obstacle.get_random_x_position()
             obstacle.y = obstacle.get_random_y_position()
+        for opponent in self.opponents:
+            opponent.unexplode()
 
     @property
     def obstacles(self) -> List[Obstacle]:
         return [obj for obj in self.static_objects if type(obj) == Obstacle]
+
+    @property
+    def opponents(self) -> List[OtherCar]:
+        return [obj for obj in self.static_objects if type(obj) == OtherCar]
 
     def _fuel_tank_collected(self) -> bool:
         collected = False
@@ -314,6 +363,14 @@ class Game:
                     self.game_speed += 1
 
         return collected
+
+    def _opponent_hit(self) -> bool:
+        non_exploded_opponents = [
+            o for o in self.opponents if not o.exploded()
+        ]
+        return any(
+            opponent for opponent in non_exploded_opponents if self.car.overlaps_with(opponent)
+        )
 
     @staticmethod
     def _reset_pressed() -> bool:
@@ -341,7 +398,7 @@ class Game:
         self.screen.blit(score, (30, 0))
 
     def _increase_speed(self) -> None:
-        self.speed = min(MAX_SPEED, self.speed + 1)
+        self.speed = min(MAX_SPEED, self.game_speed + 1)
 
 
 if __name__ == "__main__":
