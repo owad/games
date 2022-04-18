@@ -126,7 +126,8 @@ class Element:
 class Car(Element):
     image_paths = [
         # "images/delorean.png",
-        "images/acura.png",
+        # "images/acura.png",
+        "images/blue-car.png",
         # "images/maluch.png",
         # "images/kot.png",
         # "images/car.png",
@@ -288,10 +289,10 @@ class Game:
             Obstacle(screen=self.screen),
             Obstacle(screen=self.screen),
             Obstacle(screen=self.screen),
-            Obstacle(screen=self.screen),
-            OtherCar(screen=self.screen),
-            OtherCar(screen=self.screen),
-            OtherCar(screen=self.screen),
+            # Obstacle(screen=self.screen),
+            # OtherCar(screen=self.screen),
+            # OtherCar(screen=self.screen),
+            # OtherCar(screen=self.screen),
         ]
 
     def run(self):
