@@ -233,11 +233,13 @@ class Obstacle(Element):
 
 class OtherCar(Obstacle):
     obstacle_images = [
+        "images/delorean.png",
+        "images/acura.png",
+        "images/blue-car.png",
+        "images/maluch.png",
         "images/car.png",
         "images/car2.png",
         "images/car3.png",
-        "images/delorean.png",
-        "images/acura.png",
     ]
 
     def move_down(self, step: int) -> None:
@@ -289,8 +291,8 @@ class Game:
             Obstacle(screen=self.screen),
             Obstacle(screen=self.screen),
             Obstacle(screen=self.screen),
-            # Obstacle(screen=self.screen),
-            # OtherCar(screen=self.screen),
+            Obstacle(screen=self.screen),
+            OtherCar(screen=self.screen),
             # OtherCar(screen=self.screen),
             # OtherCar(screen=self.screen),
         ]
